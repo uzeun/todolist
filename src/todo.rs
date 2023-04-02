@@ -1,4 +1,4 @@
-use rocket::serde::json::{json, Value};
+use rocket::serde::json::{json, Json, Value};
 use rocket::serde::{Deserialize, Serialize};
 use rocket::tokio::sync::Mutex;
 use rocket::State;
@@ -13,16 +13,21 @@ struct Todo {
     completed: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct NewTodo {
+    title: String,
+}
+
 type TodoList = Mutex<Vec<Todo>>;
 type Todos<'r> = &'r State<TodoList>;
 
-#[post("/", format = "json", data = "<title>")]
-async fn new(title: String, list: Todos<'_>) -> Value {
+#[post("/", format = "json", data = "<new_todo>")]
+async fn new(new_todo: Json<NewTodo>, list: Todos<'_>) -> Value {
     let mut list = list.lock().await;
     let id = list.len();
     let todo = Todo {
         id: Some(id),
-        title: title,
+        title: new_todo.title.to_string(),
         completed: false,
     };
     list.push(todo);
@@ -42,12 +47,12 @@ async fn get(id: Id, list: Todos<'_>) -> Option<Value> {
     Some(json!(todo))
 }
 
-#[put("/<id>", format = "json", data = "<title>")]
-async fn edit_title(id: Id, title: String, list: Todos<'_>) -> Option<Value> {
+#[put("/<id>", format = "json", data = "<new_todo>")]
+async fn edit_title(id: Id, new_todo: Json<NewTodo>, list: Todos<'_>) -> Option<Value> {
     match list.lock().await.get_mut(id) {
         Some(existing) => {
             let title_ref = &mut existing.title;
-            *title_ref = title;
+            *title_ref = new_todo.title.to_string();
             Some(json!({"status": "ok"}))
         }
         None => None,
